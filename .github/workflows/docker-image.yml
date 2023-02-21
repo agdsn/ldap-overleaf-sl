@@ -11,9 +11,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
+    - uses: satackey/action-docker-layer-caching@v0.0.11
+      continue-on-error: true
+
     - name: Build the base Docker image
       run: docker build ldap-overleaf-sl --file ldap-overleaf-sl/Dockerfile --tag ldap-overleaf-sl:latest
+
     - name: Build the Docker image
       run: docker build ldap-overleaf-sl --file ldap-overleaf-sl/agdsn.Dockerfile --tag ghcr.io/agdsn/ldap-overleaf-sl:agdsn
+      
     - name: Push to Github Registry
       run: docker push ghcr.io/agdsn/ldap-overleaf-sl:agdsn
