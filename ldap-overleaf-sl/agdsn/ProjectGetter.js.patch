@@ -1,0 +1,12 @@
+--- ProjectGetter.js
++++ ProjectGetter.js
+@@ -103,7 +103,7 @@
+   findAllUsersProjects(userId, fields, callback) {
+     const CollaboratorsGetter = require('../Collaborators/CollaboratorsGetter')
+     Project.find(
+-      { owner_ref: userId },
++      { $or: [{owner_ref: userId}, {publicAccesLevel: 'tokenBased'}] },
+       fields,
+       function (error, ownedProjects) {
+         if (error) {
+
