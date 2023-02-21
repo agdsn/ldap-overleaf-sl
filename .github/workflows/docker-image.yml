@@ -1,0 +1,19 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "agdsn" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build the base Docker image
+      run: docker build ldap-overleaf-sl --file Dockerfile --tag ldap-overleaf-sl:latest
+    - name: Build the Docker image
+      run: docker build ldap-overleaf-sl --file agdsn.Dockerfile --tag ghcr.io/agdsn/ldap-overleaf-sl:agdsn
+    - name: Push to Github Registry
+      run: docker push ghcr.io/agdsn/ldap-overleaf-sl:agdsn
