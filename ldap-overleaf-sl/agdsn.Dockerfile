@@ -15,5 +15,5 @@ RUN update-ca-certificates
 COPY agdsn/sharelatex.conf /etc/nginx/sites-enabled/sharelatex.conf
 
 # Update TeXLive
-RUN tlmgr update --self
 RUN tlmgr install scheme-full
+RUN tlmgr path add
