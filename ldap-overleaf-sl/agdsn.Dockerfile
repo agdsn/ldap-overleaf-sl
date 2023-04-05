@@ -15,7 +15,5 @@ RUN update-ca-certificates
 COPY agdsn/sharelatex.conf /etc/nginx/sites-enabled/sharelatex.conf
 
 # Update TeXLive
-RUN tlmgr path add
-
-# Evil hack for hardcoded texlive 2021 path
-RUN ln -s /usr/local/texlive/2022 /usr/local/texlive/2021
+RUN tlmgr update --self
+RUN tlmgr install scheme-full
