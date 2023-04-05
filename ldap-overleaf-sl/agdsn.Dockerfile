@@ -1,7 +1,7 @@
 FROM ldap-overleaf-sl:latest
 
 # TeX Full
-RUN apt-get -y install texlive-full
+# RUN apt-get -y install texlive-full
 
 # Apply patches
 COPY agdsn/ProjectGetter.js.patch /tmp/ProjectGetter.js.patch
