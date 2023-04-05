@@ -12,9 +12,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - uses: satackey/action-docker-layer-caching@v0.0.11
-      continue-on-error: true
-
     - name: Build the base Docker image
       run: docker build ldap-overleaf-sl --file ldap-overleaf-sl/Dockerfile --tag ldap-overleaf-sl:latest
 
