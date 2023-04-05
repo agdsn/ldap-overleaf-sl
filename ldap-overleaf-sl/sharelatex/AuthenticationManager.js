@@ -6,19 +6,33 @@ const EmailHelper = require('../Helpers/EmailHelper')
 const {
   InvalidEmailError,
   InvalidPasswordError,
+  ParallelLoginError,
+  PasswordMustBeDifferentError,
+  PasswordReusedError,
 } = require('./AuthenticationErrors')
 const util = require('util')
+const HaveIBeenPwned = require('./HaveIBeenPwned')
+const UserAuditLogHandler = require('../User/UserAuditLogHandler')
+const logger = require('@overleaf/logger')
+const DiffHelper = require('../Helpers/DiffHelper')
+const Metrics = require('@overleaf/metrics')
 
 const { Client } = require('ldapts');
 const ldapEscape = require('ldap-escape');
-
-// https://www.npmjs.com/package/@overleaf/o-error
-// have a look if we can do nice error messages.
-
 const BCRYPT_ROUNDS = Settings.security.bcryptRounds || 12
 const BCRYPT_MINOR_VERSION = Settings.security.bcryptMinorVersion || 'a'
+const MAX_SIMILARITY = 0.7
 
-const _checkWriteResult = function(result, callback) {
+function _exceedsMaximumLengthRatio(password, maxSimilarity, value) {
+  const passwordLength = password.length
+  const lengthBoundSimilarity = (maxSimilarity / 2) * passwordLength
+  const valueLength = value.length
+  return (
+    passwordLength >= 10 * valueLength && valueLength < lengthBoundSimilarity
+  )
+}
+
+const _checkWriteResult = function (result, callback) {
   // for MongoDB
   if (result && result.modifiedCount === 1) {
     callback(null, true)
@@ -27,8 +41,50 @@ const _checkWriteResult = function(result, callback) {
   }
 }
 
+function _validatePasswordNotTooLong(password) {
+  // bcrypt has a hard limit of 72 characters.
+  if (password.length > 72) {
+    return new InvalidPasswordError({
+      message: 'password is too long',
+      info: { code: 'too_long' },
+    })
+  }
+  return null
+}
+
+function _metricsForSuccessfulPasswordMatch(password) {
+  const validationResult = AuthenticationManager.validatePassword(password)
+  const status =
+    validationResult === null ? 'success' : validationResult?.info?.code
+  Metrics.inc('check-password', { status })
+  return null
+}
+
 const AuthenticationManager = {
-  authenticate(query, password, callback) {
+  _checkUserPassword(query, password, callback) {
+    // Using Mongoose for legacy reasons here. The returned User instance
+    // gets serialized into the session and there may be subtle differences
+    // between the user returned by Mongoose vs mongodb (such as default values)
+    User.findOne(query, (error, user) => {
+      if (error) {
+        return callback(error)
+      }
+      if (!user || !user.hashedPassword) {
+        return callback(null, null, null)
+      }
+      bcrypt.compare(password, user.hashedPassword, function (error, match) {
+        if (error) {
+          return callback(error)
+        }
+        if (match) {
+          _metricsForSuccessfulPasswordMatch(password)
+        }
+        callback(null, user, match)
+      })
+    })
+  },
+
+  authenticate(query, password, auditLog, callback) {
     // Using Mongoose for legacy reasons here. The returned User instance
     // gets serialized into the session and there may be subtle differences
     // between the user returned by Mongoose vs mongodb (such as default values)
@@ -131,6 +187,8 @@ const AuthenticationManager = {
       })
     }
 
+    Metrics.inc('try-validate-password')
+
     let allowAnyChars, min, max
     if (Settings.passwordStrengthOptions) {
       allowAnyChars = Settings.passwordStrengthOptions.allowAnyChars === true
@@ -140,7 +198,7 @@ const AuthenticationManager = {
       }
     }
     allowAnyChars = !!allowAnyChars
-    min = min || 6
+    min = min || 8
     max = max || 72
 
     // we don't support passwords > 72 characters in length, because bcrypt truncates them
@@ -160,6 +218,10 @@ const AuthenticationManager = {
         info: { code: 'too_long' },
       })
     }
+    const passwordLengthError = _validatePasswordNotTooLong(password)
+    if (passwordLengthError) {
+      return passwordLengthError
+    }
     if (
       !allowAnyChars &&
       !AuthenticationManager._passwordCharactersAreValid(password)
@@ -168,9 +230,39 @@ const AuthenticationManager = {
         message: 'password contains an invalid character',
         info: { code: 'invalid_character' },
       })
+    }
+    if (typeof email === 'string' && email !== '') {
+      const startOfEmail = email.split('@')[0]
+      if (
+        password.includes(email) ||
+        password.includes(startOfEmail) ||
+        email.includes(password)
+      ) {
+        return new InvalidPasswordError({
+          message: 'password contains part of email address',
+          info: { code: 'contains_email' },
+        })
       }
-      return null
-    },
+      try {
+        const passwordTooSimilarError =
+          AuthenticationManager._validatePasswordNotTooSimilar(password, email)
+        if (passwordTooSimilarError) {
+          Metrics.inc('password-too-similar-to-email')
+          return new InvalidPasswordError({
+            message: 'password is too similar to email address',
+            info: { code: 'too_similar' },
+          })
+        }
+      } catch (error) {
+        logger.error(
+          { error },
+          'error while checking password similarity to email'
+        )
+      }
+      // TODO: remove this check once the password-too-similar checks are active?
+    }
+    return null
+  },
 
   setUserPassword(user, password, callback) {
     AuthenticationManager.setUserPasswordInV2(user, password, callback)
@@ -178,20 +270,24 @@ const AuthenticationManager = {
 
   checkRounds(user, hashedPassword, password, callback) {
     // Temporarily disable this function, TODO: re-enable this
-    //return callback()
     if (Settings.security.disableBcryptRoundsUpgrades) {
       return callback()
     }
     // check current number of rounds and rehash if necessary
     const currentRounds = bcrypt.getRounds(hashedPassword)
     if (currentRounds < BCRYPT_ROUNDS) {
-      AuthenticationManager.setUserPassword(user, password, callback)
+      AuthenticationManager._setUserPasswordInMongo(user, password, callback)
     } else {
       callback()
     }
   },
 
   hashPassword(password, callback) {
+    // Double-check the size to avoid truncating in bcrypt.
+    const error = _validatePasswordNotTooLong(password)
+    if (error) {
+      return callback(error)
+    }
     bcrypt.genSalt(BCRYPT_ROUNDS, BCRYPT_MINOR_VERSION, function (error, salt) {
       if (error) {
         return callback(error)
@@ -210,14 +306,45 @@ const AuthenticationManager = {
     if (validationError) {
       return callback(validationError)
     }
+    // check if we can log in with this password. In which case we should reject it,
+    // because it is the same as the existing password.
+    AuthenticationManager._checkUserPassword(
+      { _id: user._id },
+      password,
+      (err, _user, match) => {
+        if (err) {
+          return callback(err)
+        }
+        if (match) {
+          return callback(new PasswordMustBeDifferentError())
+        }
+
+        HaveIBeenPwned.checkPasswordForReuse(
+          password,
+          (error, isPasswordReused) => {
+            if (error) {
+              logger.err({ error }, 'cannot check password for re-use')
+            }
+
+            if (!error && isPasswordReused) {
+              return callback(new PasswordReusedError())
+            }
+
+            // password is strong enough or the validation with the service did not happen
+            this._setUserPasswordInMongo(user, password, callback)
+          }
+        )
+      }
+    )
+  },
+
+  _setUserPasswordInMongo(user, password, callback) {
     this.hashPassword(password, function (error, hash) {
       if (error) {
         return callback(error)
       }
       db.users.updateOne(
-        {
-          _id: ObjectId(user._id.toString()),
-        },
+        { _id: ObjectId(user._id.toString()) },
         {
           $set: {
             hashedPassword: hash,
@@ -263,6 +390,35 @@ const AuthenticationManager = {
       }
     }
     return true
+  },
+
+  /**
+   * Check if the password is similar to (parts of) the email address.
+   * For now, this merely sends a metric when the password and
+   * email address are deemed to be too similar to each other.
+   * Later we will reject passwords that fail this check.
+   *
+   * This logic was borrowed from the django project:
+   * https://github.com/django/django/blob/fa3afc5d86f1f040922cca2029d6a34301597a70/django/contrib/auth/password_validation.py#L159-L214
+   */
+  _validatePasswordNotTooSimilar(password, email) {
+    password = password.toLowerCase()
+    email = email.toLowerCase()
+    const stringsToCheck = [email]
+      .concat(email.split(/\W+/))
+      .concat(email.split(/@/))
+    for (const emailPart of stringsToCheck) {
+      if (!_exceedsMaximumLengthRatio(password, MAX_SIMILARITY, emailPart)) {
+        const similarity = DiffHelper.stringSimilarity(password, emailPart)
+        if (similarity > MAX_SIMILARITY) {
+          logger.warn(
+            { email, emailPart, similarity, maxSimilarity: MAX_SIMILARITY },
+            'Password too similar to email'
+          )
+          return new Error('password is too similar to email')
+        }
+      }
+    }
   },
 
   async ldapAuth(query, password, onSuccessCreateUserIfNotExistent, callback, user) {
@@ -387,3 +543,4 @@ AuthenticationManager.promises = {
 }
 
 module.exports = AuthenticationManager
+
