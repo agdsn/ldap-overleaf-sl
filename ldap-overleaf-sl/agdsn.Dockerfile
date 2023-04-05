@@ -1,7 +1,7 @@
 FROM ldap-overleaf-sl:latest
 
 # TeX Full
-# RUN apt-get -y install texlive-full
+RUN apt-get -y install texlive-full
 
 # Apply patches
 COPY agdsn/ProjectGetter.js.patch /tmp/ProjectGetter.js.patch
@@ -15,5 +15,5 @@ RUN update-ca-certificates
 COPY agdsn/sharelatex.conf /etc/nginx/sites-enabled/sharelatex.conf
 
 # Update TeXLive
-RUN tlmgr install scheme-full
+# RUN tlmgr install scheme-full
 RUN tlmgr path add
