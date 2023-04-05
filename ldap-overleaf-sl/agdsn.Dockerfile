@@ -1,9 +1,7 @@
 FROM ldap-overleaf-sl:latest
 
-FROM registry.gitlab.com/islandoftex/images/texlive:latest as texlive
-
 # TeX Full
-# RUN apt-get -y install texlive-full
+RUN apt-get -y install texlive-full
 
 # Apply patches
 COPY agdsn/ProjectGetter.js.patch /tmp/ProjectGetter.js.patch
@@ -17,7 +15,6 @@ RUN update-ca-certificates
 COPY agdsn/sharelatex.conf /etc/nginx/sites-enabled/sharelatex.conf
 
 # Update TeXLive
-COPY --from=texlive /usr/local/texlive /usr/local/texlive
 RUN tlmgr path add
 
 # Evil hack for hardcoded texlive 2021 path
