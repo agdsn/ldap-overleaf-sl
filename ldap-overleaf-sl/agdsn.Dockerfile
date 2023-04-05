@@ -18,4 +18,4 @@ COPY agdsn/sharelatex.conf /etc/nginx/sites-enabled/sharelatex.conf
 RUN tlmgr path add
 
 # Evil hack for hardcoded texlive 2021 path
-RUN rm -r /usr/local/texlive/2021 && ln -s /usr/local/texlive/2022 /usr/local/texlive/2021
+RUN ln -s /usr/local/texlive/2022 /usr/local/texlive/2021
