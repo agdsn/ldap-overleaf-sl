@@ -1,8 +1,6 @@
 FROM ldap-overleaf-sl:latest
 
-ARG TEXLIVE_IMAGE=registry.gitlab.com/islandoftex/images/texlive:latest
-
-FROM $TEXLIVE_IMAGE as texlive
+FROM registry.gitlab.com/islandoftex/images/texlive:latest as texlive
 
 # TeX Full
 # RUN apt-get -y install texlive-full
