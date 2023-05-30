@@ -1,7 +1,10 @@
 FROM ldap-overleaf-sl:latest
 
-# TeX Full
-RUN apt-get -y install texlive-full
+# update texlive distribution
+RUN  \
+  tlmgr option repository https://ftp.tu-chemnitz.de/pub/tug/historic/systems/texlive/2022/tlnet-final/ && \
+  tlmgr update --self && \
+  tlmgr install scheme-full
 
 # Apply patches
 COPY agdsn/ProjectGetter.js.patch /tmp/ProjectGetter.js.patch
