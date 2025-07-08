@@ -2,7 +2,7 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ "agdsn" ]
+    branches: [ "agdsn", "agdsn-v4" ]
 
 jobs:
 
@@ -16,7 +16,7 @@ jobs:
       run: docker build ldap-overleaf-sl --file ldap-overleaf-sl/Dockerfile --tag ldap-overleaf-sl:latest
 
     - name: Build the Docker image
-      run: docker build ldap-overleaf-sl --file ldap-overleaf-sl/agdsn.Dockerfile --tag ghcr.io/agdsn/ldap-overleaf-sl:agdsn
+      run: docker build ldap-overleaf-sl --file ldap-overleaf-sl/agdsn.Dockerfile --tag ghcr.io/agdsn/ldap-overleaf-sl:${GITHUB_REF_NAME}
       
     - name: Log in to the Container registry
       uses: docker/login-action@v2
@@ -26,4 +26,4 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Push to Github Registry
-      run: docker push ghcr.io/agdsn/ldap-overleaf-sl:agdsn
+      run: docker push ghcr.io/agdsn/ldap-overleaf-sl:${GITHUB_REF_NAME}
