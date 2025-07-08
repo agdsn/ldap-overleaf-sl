@@ -20,16 +20,6 @@ jobs:
         bash scripts/extract_files.sh 4.2.9
         bash scripts/apply_diffs.sh
 
-    - name: Build base image
-      uses: docker/build-push-action@v6
-      with:
-        context: ./ldap-overleaf-sl
-        file: ./ldap-overleaf-sl/Dockerfile
-        load: true
-        tags: ldap-overleaf-sl:latest
-        cache-from: type=gha,scope=base
-        cache-to: type=gha,mode=max,scope=base
-
     - name: Build agdsn image
       uses: docker/build-push-action@v6
       with:

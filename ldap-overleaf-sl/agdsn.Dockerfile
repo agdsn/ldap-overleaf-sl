@@ -1,4 +1,5 @@
-FROM ldap-overleaf-sl:latest
+# syntax = devthefuture/dockerfile-x
+FROM ./Dockerfile
 
 # update texlive distribution
 # WORKAROUND: calling tmgr by abspath causes the nearby executables 
