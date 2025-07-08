@@ -36,6 +36,6 @@ jobs:
         context: ./ldap-overleaf-sl
         file: ./ldap-overleaf-sl/agdsn.Dockerfile
         push: true
-        tags: ghcr.io/agdsn/ldap-overleaf-sl:${GITHUB_REF_NAME}
+        tags: ghcr.io/agdsn/ldap-overleaf-sl:${{ github.ref_name }}
         cache-from: type=gha,scope=agdsn
         cache-to: type=gha,mode=max,scope=agdsn
