@@ -12,6 +12,11 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Run prepare scripts
+      run: |
+        bash scripts/extract_files.sh 4.2.9
+        bash scripts/apply_diffs.sh
+
     - name: Build the base Docker image
       run: docker build ldap-overleaf-sl --file ldap-overleaf-sl/Dockerfile --tag ldap-overleaf-sl:latest
 
