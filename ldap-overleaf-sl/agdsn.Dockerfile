@@ -7,9 +7,9 @@ FROM ldap-overleaf-sl:latest
 #  `tlmgr` tries to execute `mtxrun` even though we can only add it to the path
 #  via `tlmgr path add` (creating symlinks in /usr/local/bin),
 #  but this makes sense only after a successful installation of context.
-ARG TLMGR=/usr/local/texlive/2022/bin/x86_64-linux/tlmgr
+ARG TLMGR=/usr/local/texlive/2023/bin/x86_64-linux/tlmgr
 RUN  \
-  ${TLMGR} option repository https://ftp.tu-chemnitz.de/pub/tug/historic/systems/texlive/2022/tlnet-final/ && \
+  ${TLMGR} option repository https://ftp.tu-chemnitz.de/pub/tug/historic/systems/texlive/2023/tlnet-final/ && \
   ${TLMGR} update --self && \
   ${TLMGR} install scheme-full && \
   ${TLMGR} path add
