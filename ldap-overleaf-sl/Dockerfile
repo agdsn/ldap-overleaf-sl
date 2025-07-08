@@ -14,7 +14,7 @@ ARG admin_is_sysadmin
 WORKDIR /overleaf/services/web
 
     # install latest npm
-RUN npm install -g npm && \
+RUN npm install -g npm@9 && \
     ## clean cache (might solve issue #2)
     # npm cache clean --force && \
     npm install ldap-escape ldapts-search ldapts@3.2.4 && \
