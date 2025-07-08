@@ -22,8 +22,8 @@ RUN npm install -g npm@9 && \
     apt-get update && \
     apt-get -y install libxml-libxslt-perl cpanminus libbtparse2 python-pygments && \
     # now install latest texlive2023 from tlmgr
-    tlmgr update --self --all  && \
-    tlmgr install scheme-full --verify-repo=none && \
+    #tlmgr update --self --all  && \
+    #tlmgr install scheme-full --verify-repo=none && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
